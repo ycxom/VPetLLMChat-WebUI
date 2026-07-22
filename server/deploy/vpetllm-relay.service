@@ -10,7 +10,7 @@ WorkingDirectory=/opt/vpetllm
 
 # 运行参数：默认已绑定 0.0.0.0:8787，如需只监听本机改为 -addr 127.0.0.1:8787
 Environment=ADDR=0.0.0.0:8787
-Environment=ALLOWED_ORIGINS=https://chat.example.com
+Environment=ALLOWED_ORIGINS=https://chat.ycxom.com
 Environment=REQUIRE_TLS=true
 
 # 用非特权用户运行（见下方安装步骤创建）
