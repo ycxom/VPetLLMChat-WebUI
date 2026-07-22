@@ -1,35 +1,12 @@
 import type { NextConfig } from "next";
 
-const csp = [
-  "default-src 'self'",
-  "base-uri 'none'",
-  "frame-ancestors 'none'",
-  "form-action 'self'",
-  "img-src 'self' data:",
-  "object-src 'none'",
-  "script-src 'self'",
-  "style-src 'self' 'unsafe-inline'",
-  "connect-src 'self' ws: wss:",
-].join("; ");
-
+// 纯浏览器端应用：静态导出为 out/，可由 Go relay 用 embed 直接托管，
+// 目标服务器无需 Node。安全响应头（CSP 等）改由托管方（Go relay 或反向代理）下发，
+// 因为 next 的 headers() 在 output:"export" 下不生效。
 const nextConfig: NextConfig = {
-  output: "standalone",
+  output: "export",
+  images: { unoptimized: true },
   poweredByHeader: false,
-  async headers() {
-    return [
-      {
-        source: "/:path*",
-        headers: [
-          { key: "Content-Security-Policy", value: csp },
-          { key: "Referrer-Policy", value: "no-referrer" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-          { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
-          { key: "Cache-Control", value: "no-store" },
-        ],
-      },
-    ];
-  },
 };
 
 export default nextConfig;

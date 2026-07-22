@@ -2,10 +2,12 @@ package main
 
 import (
 	"crypto/subtle"
+	"embed"
 	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -14,6 +16,12 @@ import (
 
 	"github.com/gorilla/websocket"
 )
+
+// web_dist 是 Next.js 静态导出（web/out）的副本。all: 前缀确保下划线开头的
+// _next 资源目录也被打包进二进制，从而无需 Node 即可托管网页。
+//
+//go:embed all:web_dist
+var webDist embed.FS
 
 const (
 	protocolVersion = 1
@@ -151,7 +159,9 @@ func (h *hub) notifyPresence(r *room) {
 
 func main() {
 	var addr string
-	flag.StringVar(&addr, "addr", envOr("ADDR", "127.0.0.1:8787"), "listen address")
+	// 默认绑定所有网卡的 8787，便于 nginx/OpenResty 等反向代理直接转发。
+	// 需要只监听本机时用 -addr 127.0.0.1:8787 或 ADDR 环境变量覆盖。
+	flag.StringVar(&addr, "addr", envOr("ADDR", "0.0.0.0:8787"), "listen address (host:port)")
 	flag.Parse()
 
 	cfg := config{
@@ -162,13 +172,32 @@ func main() {
 	h := newHub()
 	go h.run()
 
+	staticFS, ferr := fs.Sub(webDist, "web_dist")
+	if ferr != nil {
+		slog.Error("failed to mount embedded web assets", "error", ferr)
+		os.Exit(1)
+	}
+	fileServer := http.FileServer(http.FS(staticFS))
+	ws := wsHandler(cfg, h)
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /healthz", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	})
-	mux.HandleFunc("GET /{$}", wsHandler(cfg, h))
+	// 根路径：WebSocket 升级请求走中继，其余走内嵌网页静态资源。
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" && websocket.IsWebSocketUpgrade(r) {
+			ws(w, r)
+			return
+		}
+		if r.Method != http.MethodGet && r.Method != http.MethodHead {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+		fileServer.ServeHTTP(w, r)
+	})
 
 	server := &http.Server{
 		Addr:              cfg.addr,
@@ -177,7 +206,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 * 1024,
 	}
-	slog.Info("remote chat relay listening", "addr", cfg.addr)
+	slog.Info("VPetLLM remote chat: web + relay listening", "addr", cfg.addr, "require_tls", cfg.requireTLS)
 	if err := server.ListenAndServe(); !errors.Is(err, http.ErrServerClosed) {
 		slog.Error("server stopped", "error", err)
 		os.Exit(1)
@@ -327,10 +356,22 @@ func writeClose(conn *websocket.Conn, code int, reason string) {
 }
 
 func securityHeaders(next http.Handler) http.Handler {
+	const csp = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; " +
+		"img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+		"connect-src 'self' ws: wss:"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("X-Content-Type-Options", "nosniff")
-		w.Header().Set("Referrer-Policy", "no-referrer")
-		w.Header().Set("Cache-Control", "no-store")
+		hd := w.Header()
+		hd.Set("X-Content-Type-Options", "nosniff")
+		hd.Set("Referrer-Policy", "no-referrer")
+		hd.Set("X-Frame-Options", "DENY")
+		hd.Set("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
+		hd.Set("Content-Security-Policy", csp)
+		// 指纹化的静态资源可长期缓存；其余（HTML、健康检查）不缓存。
+		if strings.HasPrefix(r.URL.Path, "/_next/") {
+			hd.Set("Cache-Control", "public, max-age=31536000, immutable")
+		} else {
+			hd.Set("Cache-Control", "no-store")
+		}
 		next.ServeHTTP(w, r)
 	})
 }

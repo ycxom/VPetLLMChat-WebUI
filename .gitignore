@@ -1,5 +1,11 @@
 server/remote-chat
+server/dist/
 web/node_modules/
 web/.next/
+web/out/
 web/*.tsbuildinfo
 *.log
+
+# 内嵌网页由构建脚本从 web/out 生成，只保留占位以便 go build 始终可编译
+server/web_dist/*
+!server/web_dist/.gitkeep
