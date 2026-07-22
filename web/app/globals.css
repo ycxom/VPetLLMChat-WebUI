@@ -21,6 +21,11 @@ textarea { resize: none; min-height: 52px; max-height: 160px; border: 1px solid 
 textarea:focus { border-color: #7d89ef; box-shadow: 0 0 0 3px #7d89ef20; }
 button { align-self: stretch; min-width: 82px; border: 0; border-radius: 13px; color: white; background: #6875e8; font: inherit; font-weight: 650; cursor: pointer; }
 button:disabled { cursor: not-allowed; opacity: .4; }
+.keyform { display: flex; flex-direction: column; gap: 12px; padding: 24px; }
+.keyform input { border: 1px solid #3b4252; border-radius: 13px; padding: 13px; color: inherit; background: #1b1f28; font: inherit; outline: none; }
+.keyform input:focus { border-color: #7d89ef; box-shadow: 0 0 0 3px #7d89ef20; }
+.keyform button { align-self: flex-end; padding: 11px 22px; }
+.key-error { margin: 0; color: #ffb2b9; font-size: 13px; }
 .interaction-overlay { position: fixed; inset: 0; display: grid; place-items: center; padding: 24px; background: #000a; z-index: 50; }
 .interaction-card { width: min(460px, 100%); border: 1px solid #514574; border-radius: 18px; padding: 22px; background: #1b1f28; box-shadow: 0 24px 80px #000a; display: flex; flex-direction: column; gap: 12px; }
 .interaction-card h2 { margin: 0; font-size: 17px; }
