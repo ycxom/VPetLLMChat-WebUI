@@ -1,0 +1,16 @@
+services:
+  relay:
+    build: ./server
+    restart: unless-stopped
+    environment:
+      ADDR: 0.0.0.0:8787
+      ALLOWED_ORIGINS: http://localhost:3000
+      REQUIRE_TLS: "false"
+    ports:
+      - "127.0.0.1:8787:8787"
+
+  web:
+    build: ./web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"

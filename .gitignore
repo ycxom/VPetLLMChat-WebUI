@@ -1,0 +1,5 @@
+server/remote-chat
+web/node_modules/
+web/.next/
+web/*.tsbuildinfo
+*.log
