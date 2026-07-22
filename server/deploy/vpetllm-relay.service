@@ -1,0 +1,39 @@
+[Unit]
+Description=VPetLLM Remote Chat relay (web + websocket)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# 二进制与工作目录，按实际部署路径修改
+ExecStart=/opt/vpetllm/vpetllm-relay-linux-amd64
+WorkingDirectory=/opt/vpetllm
+
+# 运行参数：默认已绑定 0.0.0.0:8787，如需只监听本机改为 -addr 127.0.0.1:8787
+Environment=ADDR=0.0.0.0:8787
+Environment=ALLOWED_ORIGINS=https://chat.example.com
+Environment=REQUIRE_TLS=true
+
+# 用非特权用户运行（见下方安装步骤创建）
+User=vpetllm
+Group=vpetllm
+
+Restart=always
+RestartSec=2
+# 崩溃循环保护：10 秒内最多重启 5 次
+StartLimitIntervalSec=10
+StartLimitBurst=5
+
+# 安全加固（单文件、无需写盘，可全部收紧）
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+AmbientCapabilities=
+
+[Install]
+WantedBy=multi-user.target
