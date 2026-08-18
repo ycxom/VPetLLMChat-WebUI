@@ -10,6 +10,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -221,6 +222,11 @@ func wsHandler(cfg config, h *hub) http.HandlerFunc {
 			if origin == "" { // Native plugin clients do not send Origin.
 				return true
 			}
+			// 同源始终放行：网页由本 relay 自身托管时，浏览器 Origin 的 host
+			// 等于请求的 Host（反代需透传 Host 头），无需再配 ALLOWED_ORIGINS。
+			if u, err := url.Parse(origin); err == nil && u.Host == r.Host {
+				return true
+			}
 			_, ok := cfg.allowedOrigins[origin]
 			return ok
 		},
@@ -356,8 +362,10 @@ func writeClose(conn *websocket.Conn, code int, reason string) {
 }
 
 func securityHeaders(next http.Handler) http.Handler {
+	// Next.js 静态导出会注入第一方内联启动脚本；静态托管无法用 nonce，
+	// 故 script-src 需放开 'unsafe-inline'（应用不渲染用户 HTML，残余 XSS 风险低）。
 	const csp = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; " +
-		"img-src 'self' data:; object-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; " +
+		"img-src 'self' data:; object-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; " +
 		"connect-src 'self' ws: wss:"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		hd := w.Header()
